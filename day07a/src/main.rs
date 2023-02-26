@@ -1,64 +1,29 @@
-use std::collections::HashMap;
+//I did not made this one. used this solution:https://github.com/timvisee/advent-of-code-2022/blob/master/day07a/src/main.rs
+//wasen't in the mood of dealing with refcell, or using a lib. this code do not handle the case where we re-enter a directory.
+use std::iter::Peekable;
 
-fn main() {
-    let input = &mut include_str!("../input.txt").lines().peekable();
-    let mut file_tree = HashMap::new();
-    let mut current_path = String::with_capacity(100);
-    current_path.push('/');
-    let mut result = 0;
+pub fn main() {
+    let (d, mut s) = (include_bytes!("../input.txt"), 0);
+    sh(&mut d.split(|b| b == &b'\n').peekable(), &mut s);
+    println!("{}", s);
+}
 
-    while let Some(it) = input.next() {
-        let mut size = 0;
-        match it {
-            "$ cd .." => {
-                // println!("before:{}", current_path);
-                current_path.truncate(
-                    current_path
-                        .rfind("/")
-                        .expect(&format!("did not found a `/`, current:{}", current_path))
-                        + 1,
-                ); // remove the last `/path`
-                   // println!("after:{}", current_path)
+fn sh(lines: &mut Peekable<impl Iterator<Item = &'static [u8]>>, sum: &mut u64) -> u64 {
+    let mut size = 0;
+    while let Some(i) = lines.next() {
+        match i {
+            b"$ cd .." => break,
+            _ if &i[0..3] == b"$ l" => {
+                size = std::iter::from_fn(|| lines.next_if(|i| i[0] != b'$'))
+                    .filter(|i| i[0] != b'd')
+                    .filter_map(|i| atoi::atoi::<u64>(i.split(|b| b == &b' ').next().unwrap()))
+                    .sum()
             }
-            "$ ls" => {
-                size = std::iter::from_fn(|| input.next_if(|i| i.as_bytes()[0] != b'$')) // equivalent to starts_with("$")
-                    .filter(|i| i.as_bytes()[0] != b'd') // ignore dirs
-                    .filter_map(|i| {
-                        i.split(" ")
-                            .next()
-                            .expect("string did not have any spaces?")
-                            .parse::<u32>()
-                            .ok()
-                    })
-                    .sum();
-                println!("size: {size}");
-                // .for_each(|i| println!("value: {i}"))
-            }
-            _ if it.starts_with("$ cd") => {
-                let dir_name = it
-                    .split(" ")
-                    .last()
-                    .expect(&format!("did not found a path on {}", it))
-                    .to_owned();
-
-                if dir_name == "/" {
-                    continue;
-                }
-
-                current_path.push_str(&dir_name);
-
-                // could not find a way to not clone here, is it really impossible?
-                file_tree.entry(current_path.clone()).or_insert(0);
-            }
-            _ => {
-                unreachable!("All non command lines will be handled within `ls` block")
-            }
-        };
-        // println!("{it} -- {current_path}");
-        if size <= 100_000 {
-            result += size;
+            _ => size += sh(lines, sum),
         }
     }
-
-    println!("\n\nresult:{result}");
+    if size <= 100_000 {
+        *sum += size;
+    }
+    size
 }
