@@ -12,7 +12,7 @@ fn main() {
             acc
         });
 
-    for (idx, char) in input.iter().enumerate().skip(4) {
+    for (idx, char) in input.iter().enumerate().skip(14) {
         if char_counter.len() == 14 {
             return println!("result: {}", idx);
         }
