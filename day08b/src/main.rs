@@ -28,18 +28,26 @@ struct Grid {
     cols: usize,
 }
 
+#[derive(Debug)]
 struct GridCell {
     row: usize,
     col: usize,
     val: i32,
 }
+
+#[derive(Debug)]
 struct MonotonicStack(Vec<GridCell>);
 
 impl MonotonicStack {
-    fn push(&mut self, value: i32) {
-        while let Some(_) = self.0.last().and_then(|top| Some(value > top.val)) {
+    fn push(&mut self, cell: GridCell) {
+        while let Some(_) = self.0.last().and_then(|top| Some(cell.val > top.val)) {
             self.0.pop();
         }
+        self.0.push(cell);
+    }
+
+    fn top(&self) -> Option<&GridCell> {
+        self.0.last()
     }
 }
 
@@ -61,31 +69,30 @@ impl Grid {
     }
 
     #[inline]
-    fn update_visibility(
-        &mut self,
-        current_max: &mut i32,
-        max_row: &mut usize,
-        max_col: &mut usize,
-        row: usize,
-        col: usize,
-    ) {
+    fn update_visibility(&mut self, stack: &mut MonotonicStack, row: usize, col: usize) {
         if self.is_border(row, col) {
             self.visible[row][col] = 0
         }
-        self.visible[row][col] *= ((row + col - *max_row - *max_col) as i32).abs();
-        if self.values[row][col] >= *current_max {
-            println!(
-                "{row} - {max_row} | {col} - {max_col} | {} | {}",
-                self.visible[row][col], self.visible[row][col]
-            );
 
-            // println!("({row}|{col}) -> {} > {current_max}", self.values[row][col]);
-            // println!(
-            //     "{}|{}|{}|{} -> {}",
-            //     row, col, *max_row, *max_col, self.visible[row][col]
-            // );
-            (*max_row, *max_col, *current_max) = (row, col, self.values[row][col]);
-        }
+        stack.push(GridCell {
+            col,
+            row,
+            val: self.values[row][col],
+        });
+
+        let GridCell {
+            col: max_col,
+            row: max_row,
+            val: current_max,
+        } = stack.top().expect("stack should not be empty");
+
+        // self.visible[row][col] *= ((row + col - *max_row - *max_col) as i32).abs();
+        // if self.values[row][col] >= *current_max {
+        //     println!(
+        //         "{row} - {max_row} | {col} - {max_col} | {} | {}",
+        //         self.visible[row][col], self.visible[row][col]
+        //     );
+        // }
     }
 
     fn max_scenic_score(&self) -> i32 {
@@ -110,9 +117,9 @@ impl Grid {
 
     fn process_cols(&mut self) {
         for col in 0..self.cols {
-            let (mut current_max, mut max_row, mut max_col) = (-1, 0, 0);
+            let mut stack = MonotonicStack(Vec::with_capacity(self.rows));
             for row in 0..self.rows {
-                self.update_visibility(&mut current_max, &mut max_row, &mut max_col, row, col)
+                self.update_visibility(&mut stack, row, col)
             }
         }
     }
