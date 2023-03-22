@@ -108,5 +108,3 @@ impl Grid {
         }
     }
 }
-
-// fn iterate
