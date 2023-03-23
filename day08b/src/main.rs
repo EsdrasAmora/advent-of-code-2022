@@ -14,7 +14,7 @@ fn main() {
     grid.process_cols();
     grid.process_rows_rev();
     grid.process_cols_rev();
-    // dbg!(&grid.visible);
+    dbg!(&grid.visible);
 
     println!("max_scenic_score: {}", grid.max_scenic_score());
 }
@@ -36,28 +36,6 @@ struct GridCell {
 #[derive(Debug)]
 struct MonotonicStack(Vec<GridCell>);
 
-impl MonotonicStack {
-    fn push(&mut self, cell: GridCell, default: &GridCell) -> GridCell {
-        while let Some(_) = self
-            .0
-            .last()
-            .and_then(|top| (cell.val > top.val).then_some(true))
-        {
-            self.0.pop();
-        }
-
-        self.0.push(cell);
-        if self.0.len() == 1 {
-            return default.clone();
-        }
-        return self.0[self.0.len() - 2].clone();
-    }
-
-    fn clear(&mut self) {
-        self.0.clear();
-    }
-}
-
 impl Grid {
     fn new(values: Vec<Vec<u32>>) -> Self {
         let (rows, cols) = (values.len(), values[0].len());
@@ -70,25 +48,6 @@ impl Grid {
         }
     }
 
-    #[inline]
-    fn is_border(&self, row: usize, col: usize) -> bool {
-        col == 0 || row == 0 || col == self.cols - 1 || row == self.rows - 1
-    }
-
-    #[inline]
-    fn update_visibility(
-        &mut self,
-        stack: &mut MonotonicStack,
-        current: GridCell,
-        initial: &GridCell,
-    ) {
-        let previous = stack.push(current.clone(), initial);
-
-        self.visible[current.row][current.col] *=
-            (current.row as i32 + current.col as i32 - previous.row as i32 - previous.col as i32)
-                .abs() as u32;
-    }
-
     fn max_scenic_score(&self) -> u32 {
         (1..self.rows - 1)
             .flat_map(move |row| (1..self.cols - 1).clone().map(move |col| [row, col]))
@@ -99,9 +58,10 @@ impl Grid {
 
     fn process_rows(&mut self) {
         let mut initial = GridCell::default();
+        let mut stack = MonotonicStack(Vec::with_capacity(self.cols));
 
         for row in 0..self.rows {
-            let mut stack = MonotonicStack(Vec::with_capacity(self.cols));
+            stack.clear();
             initial.row = row;
             for col in 0..self.cols {
                 let current = GridCell {
@@ -116,9 +76,10 @@ impl Grid {
 
     fn process_cols(&mut self) {
         let mut initial = GridCell::default();
+        let mut stack = MonotonicStack(Vec::with_capacity(self.rows));
 
         for col in 0..self.cols {
-            let mut stack = MonotonicStack(Vec::with_capacity(self.rows));
+            stack.clear();
             initial.col = col;
             for row in 0..self.rows {
                 let current = GridCell {
@@ -132,27 +93,29 @@ impl Grid {
     }
 
     fn process_rows_rev(&mut self) {
-        let mut initial = GridCell {
+        let mut stack = MonotonicStack(Vec::with_capacity(self.cols));
+        let mut start = GridCell {
             row: self.rows - 1,
             col: self.cols - 1,
             val: 0,
         };
 
         for row in 0..self.rows {
-            let mut stack = MonotonicStack(Vec::with_capacity(self.cols));
-            initial.row = row;
+            stack.clear();
+            start.row = row;
             for col in (0..self.cols).rev() {
                 let current = GridCell {
                     col,
                     row,
                     val: self.values[row][col],
                 };
-                self.update_visibility(&mut stack, current, &initial)
+                self.update_visibility(&mut stack, current, &start)
             }
         }
     }
 
     fn process_cols_rev(&mut self) {
+        let mut stack = MonotonicStack(Vec::with_capacity(self.rows));
         let mut initial = GridCell {
             row: self.rows - 1,
             col: self.cols - 1,
@@ -160,7 +123,7 @@ impl Grid {
         };
 
         for col in 0..self.cols {
-            let mut stack = MonotonicStack(Vec::with_capacity(self.rows));
+            stack.clear();
             initial.col = col;
             for row in (0..self.rows).rev() {
                 let current = GridCell {
@@ -171,5 +134,48 @@ impl Grid {
                 self.update_visibility(&mut stack, current, &initial)
             }
         }
+    }
+
+    #[inline]
+    fn update_visibility(
+        &mut self,
+        stack: &mut MonotonicStack,
+        current: GridCell,
+        start: &GridCell,
+    ) {
+        stack.push(current.clone());
+        let previous = stack.previous(start);
+
+        self.visible[current.row][current.col] *=
+            (current.row as i32 + current.col as i32 - previous.row as i32 - previous.col as i32)
+                .abs() as u32;
+    }
+}
+
+impl MonotonicStack {
+    #[inline]
+    fn push(&mut self, cell: GridCell) {
+        while let Some(_) = self
+            .0
+            .last()
+            .and_then(|top| (cell.val > top.val).then_some(true))
+        {
+            self.0.pop();
+        }
+
+        self.0.push(cell);
+    }
+
+    #[inline]
+    fn previous(&self, default: &GridCell) -> GridCell {
+        if self.0.len() == 1 {
+            return default.clone();
+        }
+        return self.0[self.0.len() - 2].clone();
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        self.0.clear();
     }
 }
